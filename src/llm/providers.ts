@@ -26,6 +26,8 @@ export interface ModelSpec {
   maxOutputTokens?: number;
   /** For a local server: at most this many requests at once to it. */
   maxConcurrent?: number;
+  /** A stable id for the conversation, sent where a provider routes and caches by it (OpenCode). */
+  sessionId?: string;
 }
 
 export type ProviderOptions = Record<string, Record<string, unknown>>;
@@ -166,17 +168,25 @@ export function createModel(spec: ModelSpec, options: CreateModelOptions = {}): 
   }
 }
 
+export const OPENCODE_USER_AGENT = 'nanobrowser/0.3.0';
+
 /** An OpenCode model, on its family's endpoint, with the key as a bearer token on every family. */
 function createOpenCodeModel(spec: ModelSpec, fetch?: typeof globalThis.fetch): ChatModel {
   const { modelName, apiKey = '' } = spec;
   const root = DEFAULT_BASE_URLS[spec.kind]!;
-  const bearer = { Authorization: `Bearer ${apiKey}` };
+  // OpenCode asks every client for its own user agent and a stable session id per conversation
+  // (https://opencode.ai/docs/go, "Where can I use it?"); Go refuses a request without the id.
+  const identity = {
+    'User-Agent': OPENCODE_USER_AGENT,
+    'x-opencode-session': spec.sessionId ?? crypto.randomUUID(),
+  };
+  const bearer = { Authorization: `Bearer ${apiKey}`, ...identity };
   switch (openCodeFamily(modelName)) {
     case 'anthropic': {
       const anthropic = createAnthropic({
         authToken: apiKey,
         baseURL: `${root}/anthropic/v1`,
-        headers: { 'anthropic-dangerous-direct-browser-access': 'true' },
+        headers: { 'anthropic-dangerous-direct-browser-access': 'true', ...identity },
         fetch,
       });
       return {
@@ -190,7 +200,7 @@ function createOpenCodeModel(spec: ModelSpec, fetch?: typeof globalThis.fetch): 
       return { spec, model: google(modelName) };
     }
     case 'openai': {
-      const openai = createOpenAI({ apiKey, baseURL: `${root}/openai/v1`, fetch });
+      const openai = createOpenAI({ apiKey, baseURL: `${root}/openai/v1`, headers: identity, fetch });
       return {
         spec,
         model: openai.responses(modelName),
@@ -198,7 +208,7 @@ function createOpenCodeModel(spec: ModelSpec, fetch?: typeof globalThis.fetch): 
       };
     }
     default: {
-      const openai = createOpenAI({ apiKey, baseURL: `${root}/openai/v1`, fetch });
+      const openai = createOpenAI({ apiKey, baseURL: `${root}/openai/v1`, headers: identity, fetch });
       return { spec, model: openai.chat(modelName), providerOptions: { openai: { strictJsonSchema: false } } };
     }
   }

@@ -1130,7 +1130,7 @@ export class RunManager {
     const conversation = await getConversation(conversationId);
     if (!conversation) return;
     try {
-      const model = await resolveModel(await livePair(conversationId));
+      const model = await resolveModel(await livePair(conversationId), conversationId);
       const settings = (await settingsStorage.get()) ?? DEFAULT_SETTINGS;
       const tools = toolsForRun({ vision: model.profile.vision });
       const system = agentSystemPrompt({
@@ -1293,7 +1293,7 @@ export class RunManager {
       await this.#setStatus(record, 'running');
       let end: LoopEnd | undefined;
       try {
-        const model = await resolveModel(await starting);
+        const model = await resolveModel(await starting, conversationId);
         const settings = (await settingsStorage.get()) ?? DEFAULT_SETTINGS;
         record.model = await runModel(model.ref);
         if (record.model) {

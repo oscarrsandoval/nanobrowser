@@ -160,6 +160,12 @@ describe('providers', () => {
       maxOutputTokens: 1000,
     });
     expect(goClaude.url).toBe('https://opencode.ai/inference/go/anthropic/v1/messages');
+    expect(goClaude.headers.get('x-opencode-session')).toBeTruthy();
+
+    const session = await capture({ kind: 'opencode-go', modelName: 'glm-5.3', apiKey: 'oc', sessionId: 'conv-1' });
+    expect(session.headers.get('x-opencode-session')).toBe('conv-1');
+    const gem = await capture({ kind: 'opencode-go', modelName: 'gemini-4-argon', apiKey: 'oc', sessionId: 'conv-1' });
+    expect(gem.headers.get('x-opencode-session')).toBe('conv-1');
     expect(open.headers.get('authorization')).toBe('Bearer oc');
   });
 });

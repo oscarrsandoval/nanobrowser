@@ -35,7 +35,7 @@ export async function livePair(conversationId: string | null): Promise<LivePair 
   return makePair(model, settings.reasoning, capabilityOf(providers, model));
 }
 
-export async function resolveModel(pair: LivePair | null): Promise<ResolvedModel> {
+export async function resolveModel(pair: LivePair | null, sessionId?: string): Promise<ResolvedModel> {
   if (!pair) throw new ModelUnavailable('No model is chosen. Add one in Settings → Providers.');
   const ref = pair.model;
   const providers = await providersStorage.get();
@@ -81,6 +81,7 @@ export async function resolveModel(pair: LivePair | null): Promise<ResolvedModel
     apiKey: keys[found.provider.id],
     baseUrl: found.provider.baseUrl,
     maxOutputTokens: profile.maxOutput,
+    ...(sessionId ? { sessionId } : {}),
     // Ollama and LM Studio take one request at a time by default; more wait in the extension, not on the server.
     ...(LOCAL_KINDS.has(found.provider.kind) ? { maxConcurrent: 1 } : {}),
   });

@@ -4,6 +4,7 @@
 // Detection from a local server then lowers the window.
 import { defaults, findRow, isCloudEndpoint, sendRule } from './catalogue';
 import type { ReasoningEffort, ReasoningSupport, WireEffort } from './catalogue';
+import { effectiveKind } from './providers';
 import type { ProviderKind } from './providers';
 
 export interface ModelProfile {
@@ -64,7 +65,7 @@ export function capabilityFrom(
 /** Each reasoning fact from the first source that states it, and whether vision was stated. */
 function reasoningFacts(input: ProfileInput) {
   const cloud = isCloudEndpoint(input.kind, input.baseUrl);
-  const row = findRow(input.kind, input.modelName, undefined, cloud);
+  const row = findRow(effectiveKind(input.kind, input.modelName), input.modelName, undefined, cloud);
   const { tested, fromApi, overrides } = input;
   // A row states both facts; a family row only that the model reasons.
   const rowReasons = row?.reasoning === undefined ? undefined : row.reasoning !== 'none';
@@ -102,7 +103,7 @@ export function resolveProfile(input: ProfileInput): ModelProfile {
     profile.contextWindow = Math.min(profile.contextWindow, input.detectedContext);
   }
   profile.maxOutput = Math.min(profile.maxOutput, profile.contextWindow);
-  const factor = defaults.countFactor[input.kind];
+  const factor = defaults.countFactor[effectiveKind(input.kind, input.modelName)];
   if (factor) profile.countFactor = factor;
   return profile;
 }

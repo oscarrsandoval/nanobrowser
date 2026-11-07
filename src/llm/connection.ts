@@ -1,6 +1,13 @@
 // Test models and model lists for the Models page. Called from the options page directly: the page needs no
 // worker command.
-import { CHAT_COMPLETIONS_KINDS, createModel, DEFAULT_BASE_URLS, openAICompatibleBaseUrl } from './providers';
+import {
+  CHAT_COMPLETIONS_KINDS,
+  createModel,
+  DEFAULT_BASE_URLS,
+  effectiveKind,
+  openCodeModelsUrl,
+  openAICompatibleBaseUrl,
+} from './providers';
 import type { CreateModelOptions, ModelSpec } from './providers';
 import { isOriginRefused } from './errors';
 import { refusesImages, refusesReasoning, streamTurn } from './stream';
@@ -94,7 +101,7 @@ export async function testConnection(
 
   // The effort probe: Low, then Medium, then High, to the first accepted. "Reasons: no" only when all are refused,
   // since a model can refuse one level and take another; reasoning tokens in an accepted reply mean it reasons.
-  if (CHAT_COMPLETIONS_KINDS.includes(spec.kind)) {
+  if (CHAT_COMPLETIONS_KINDS.includes(effectiveKind(spec.kind, spec.modelName))) {
     let allRefused = true;
     for (const level of ['low', 'medium', 'high'] as const) {
       const r = await once({ reasoning: level });
@@ -208,6 +215,12 @@ export async function listModels(
             (gemini(a) ? version(b) - version(a) || 0 : 0) ||
             b.localeCompare(a, 'en', { numeric: true }),
         );
+      break;
+    }
+    case 'opencode':
+    case 'opencode-go': {
+      const body = await get(openCodeModelsUrl(spec.kind), { authorization: `Bearer ${spec.apiKey ?? ''}` });
+      entries = ((body.data as ListEntry[]) ?? []).map(m => [String(m.id), m]);
       break;
     }
     case 'ollama': {

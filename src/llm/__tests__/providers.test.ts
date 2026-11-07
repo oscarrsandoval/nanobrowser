@@ -125,6 +125,43 @@ describe('providers', () => {
     expect(r.url).toBe('https://openrouter.ai/api/v1/chat/completions');
     expect(r.headers.get('x-title')).toBe('Nanobrowser');
   });
+
+  it('OpenCode: each family on its endpoint, with the key as a bearer token', async () => {
+    const claude = await capture({
+      kind: 'opencode',
+      modelName: 'claude-sonnet-5-5',
+      apiKey: 'oc',
+      maxOutputTokens: 1000,
+    });
+    expect(claude.url).toBe('https://opencode.ai/inference/anthropic/v1/messages');
+    expect(claude.headers.get('authorization')).toBe('Bearer oc');
+    expect(claude.headers.get('x-api-key')).toBeNull();
+
+    const gpt = await capture({ kind: 'opencode', modelName: 'gpt-6.1-sol', apiKey: 'oc' });
+    expect(gpt.url).toBe('https://opencode.ai/inference/openai/v1/responses');
+    expect(gpt.headers.get('authorization')).toBe('Bearer oc');
+
+    const gemini = await capture({ kind: 'opencode', modelName: 'gemini-4-argon', apiKey: 'oc' });
+    expect(gemini.url).toContain(
+      'https://opencode.ai/inference/google/v1beta/models/gemini-4-argon:streamGenerateContent',
+    );
+    expect(gemini.headers.get('authorization')).toBe('Bearer oc');
+
+    const open = await capture({ kind: 'opencode', modelName: 'glm-5.3', apiKey: 'oc' });
+    expect(open.url).toBe('https://opencode.ai/inference/openai/v1/chat/completions');
+
+    const go = await capture({ kind: 'opencode-go', modelName: 'deepseek-v4.1-flash', apiKey: 'oc' });
+    expect(go.url).toBe('https://opencode.ai/inference/go/openai/v1/chat/completions');
+    expect(go.headers.get('authorization')).toBe('Bearer oc');
+    const goClaude = await capture({
+      kind: 'opencode-go',
+      modelName: 'claude-haiku-5-5',
+      apiKey: 'oc',
+      maxOutputTokens: 1000,
+    });
+    expect(goClaude.url).toBe('https://opencode.ai/inference/go/anthropic/v1/messages');
+    expect(open.headers.get('authorization')).toBe('Bearer oc');
+  });
 });
 
 describe('helpers', () => {

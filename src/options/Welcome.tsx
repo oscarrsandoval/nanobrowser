@@ -192,7 +192,7 @@ function ModelStep() {
 
 const LOCAL: ProviderKind[] = ['ollama', 'lmstudio'];
 // The cloud providers in the welcome page's order, OpenAI first.
-const CLOUD: ProviderKind[] = ['openai', 'anthropic', 'gemini', 'openrouter'];
+const CLOUD: ProviderKind[] = ['openai', 'anthropic', 'gemini', 'openrouter', 'opencode-go', 'opencode'];
 
 /** Connect to a server or a provider, pick a model, test its tool calling and make it the default. */
 function ModelSetup({ local }: { local: boolean }) {

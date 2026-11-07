@@ -1,7 +1,7 @@
 // What a vendor's model API says about a model: read when the model is tested, before any probe, at no cost in tokens.
 // One parser reads the fields any of the APIs return; a field the API does not state is left out, for the next source
 // to say.
-import { openAICompatibleBaseUrl } from './providers';
+import { openAICompatibleBaseUrl, openCodeModelsUrl } from './providers';
 import type { ModelSpec } from './providers';
 import type { LearntFacts } from './profiles';
 
@@ -116,6 +116,12 @@ export async function readModelInfo(
       record = await get(`${spec.baseUrl || 'https://generativelanguage.googleapis.com/v1beta'}/models/${id}`, {
         headers: { 'x-goog-api-key': spec.apiKey ?? '' },
       });
+      break;
+    case 'opencode':
+    case 'opencode-go':
+      record = fromList(
+        await get(openCodeModelsUrl(kind), { headers: { authorization: `Bearer ${spec.apiKey ?? ''}` } }),
+      );
       break;
     case 'ollama': {
       const root = (openAICompatibleBaseUrl(kind, spec.baseUrl) ?? '').replace(/\/v1$/, '');

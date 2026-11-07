@@ -7,7 +7,15 @@ import { createOpenAI } from '@ai-sdk/openai';
 import type { LanguageModel } from 'ai';
 
 export type ProviderKind =
-  'anthropic' | 'openai' | 'gemini' | 'openai-compatible' | 'ollama' | 'lmstudio' | 'openrouter';
+  | 'anthropic'
+  | 'openai'
+  | 'gemini'
+  | 'openai-compatible'
+  | 'ollama'
+  | 'lmstudio'
+  | 'openrouter'
+  | 'opencode'
+  | 'opencode-go';
 
 /** Everything needed to call one model. The key is passed in; src/llm never reads storage. */
 export interface ModelSpec {
@@ -39,7 +47,39 @@ export const DEFAULT_BASE_URLS: Partial<Record<ProviderKind, string>> = {
   ollama: 'http://localhost:11434/v1',
   lmstudio: 'http://localhost:1234/v1',
   openrouter: 'https://openrouter.ai/api/v1',
+  opencode: 'https://opencode.ai/inference',
+  // The Go subscription's endpoints; the ones without `/go` bill the pay-as-you-go balance (https://opencode.ai/docs/go).
+  'opencode-go': 'https://opencode.ai/inference/go',
 };
+
+/**
+ * OpenCode serves each model through one API family at https://opencode.ai/inference, all with
+ * `Authorization: Bearer <key>` (https://opencode.ai/docs/console/api/inference): Claude and Qwen on Anthropic
+ * Messages, GPT on OpenAI Responses, Gemini on Gemini's API, the open models on chat completions.
+ */
+export type OpenCodeFamily = 'anthropic' | 'openai' | 'gemini' | 'openai-compatible';
+
+export function openCodeFamily(modelName: string): OpenCodeFamily {
+  const name = modelName.toLowerCase();
+  if (/^(claude|qwen)/.test(name)) return 'anthropic';
+  if (/^gemini/.test(name)) return 'gemini';
+  if (/^gpt-(?!oss)/.test(name)) return 'openai';
+  return 'openai-compatible';
+}
+
+/** The kind whose catalogue rows and behaviour a model takes: an OpenCode model takes its family's. */
+export function effectiveKind(kind: ProviderKind, modelName: string): ProviderKind {
+  return isOpenCode(kind) ? openCodeFamily(modelName) : kind;
+}
+
+export function isOpenCode(kind: ProviderKind): kind is 'opencode' | 'opencode-go' {
+  return kind === 'opencode' || kind === 'opencode-go';
+}
+
+/** The model list of OpenCode's pay-as-you-go or Go endpoints. */
+export function openCodeModelsUrl(kind: 'opencode' | 'opencode-go'): string {
+  return `${DEFAULT_BASE_URLS[kind]}/v1/models`;
+}
 
 /**
  * The kinds that speak chat completions at a base URL. Their servers may refuse `reasoning_effort`, which the run's
@@ -60,6 +100,7 @@ export function openAICompatibleBaseUrl(kind: ProviderKind, baseUrl?: string): s
   const fallback = DEFAULT_BASE_URLS[kind];
   // OpenRouter's address is fixed: the card has no field for it.
   if (kind === 'openrouter') return fallback;
+  if (isOpenCode(kind)) return `${fallback}/openai/v1`;
   const url = (baseUrl?.trim() || fallback)?.replace(/\/+$/, '');
   if (!url) return undefined;
   if (kind === 'ollama' || kind === 'lmstudio') return url.endsWith('/v1') ? url : `${url}/v1`;
@@ -70,6 +111,9 @@ export function createModel(spec: ModelSpec, options: CreateModelOptions = {}): 
   const { kind, modelName, apiKey } = spec;
   const fetch = options.fetch;
   switch (kind) {
+    case 'opencode':
+    case 'opencode-go':
+      return createOpenCodeModel(spec, fetch);
     case 'anthropic': {
       const anthropic = createAnthropic({
         apiKey,
@@ -118,6 +162,44 @@ export function createModel(spec: ModelSpec, options: CreateModelOptions = {}): 
         providerOptions: { openai: { strictJsonSchema: false } },
         ...(accounting ? { takeCost: accounting.takeCost } : {}),
       };
+    }
+  }
+}
+
+/** An OpenCode model, on its family's endpoint, with the key as a bearer token on every family. */
+function createOpenCodeModel(spec: ModelSpec, fetch?: typeof globalThis.fetch): ChatModel {
+  const { modelName, apiKey = '' } = spec;
+  const root = DEFAULT_BASE_URLS[spec.kind]!;
+  const bearer = { Authorization: `Bearer ${apiKey}` };
+  switch (openCodeFamily(modelName)) {
+    case 'anthropic': {
+      const anthropic = createAnthropic({
+        authToken: apiKey,
+        baseURL: `${root}/anthropic/v1`,
+        headers: { 'anthropic-dangerous-direct-browser-access': 'true' },
+        fetch,
+      });
+      return {
+        spec,
+        model: anthropic(modelName),
+        providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } },
+      };
+    }
+    case 'gemini': {
+      const google = createGoogle({ apiKey, baseURL: `${root}/google/v1beta`, headers: bearer, fetch });
+      return { spec, model: google(modelName) };
+    }
+    case 'openai': {
+      const openai = createOpenAI({ apiKey, baseURL: `${root}/openai/v1`, fetch });
+      return {
+        spec,
+        model: openai.responses(modelName),
+        providerOptions: { openai: { strictJsonSchema: false, store: false } },
+      };
+    }
+    default: {
+      const openai = createOpenAI({ apiKey, baseURL: `${root}/openai/v1`, fetch });
+      return { spec, model: openai.chat(modelName), providerOptions: { openai: { strictJsonSchema: false } } };
     }
   }
 }

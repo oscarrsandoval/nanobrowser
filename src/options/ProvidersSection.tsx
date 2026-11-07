@@ -32,6 +32,8 @@ export const KINDS: Array<{ kind: ProviderKind; label: string; needsKey: boolean
   { kind: 'openai', label: 'OpenAI', needsKey: true },
   { kind: 'gemini', label: 'Google Gemini', needsKey: true },
   { kind: 'openrouter', label: 'OpenRouter', needsKey: true },
+  { kind: 'opencode-go', label: 'OpenCode Go', needsKey: true },
+  { kind: 'opencode', label: 'OpenCode (pay as you go)', needsKey: true },
   { kind: 'ollama', label: 'Ollama', needsKey: false, baseUrl: 'http://localhost:11434' },
   { kind: 'lmstudio', label: 'LM Studio', needsKey: false, baseUrl: 'http://localhost:1234' },
   { kind: 'openai-compatible', label: 'OpenAI-compatible', needsKey: false, baseUrl: '' },
